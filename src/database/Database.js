@@ -13,24 +13,6 @@ class Database {
 		return connection;
 	}
 
-	static async execute(statement, bindParameters) {
-		const connection = await Database.connect();
-		let results;
-
-		try {
-			[results] = await connection.execute(statement, bindParameters);
-		}
-		catch (exception) {
-			console.log(exception);
-			return null;
-		}
-		finally {
-			await connection.end();
-		}
-
-		return results;
-	}
-
 	static async truncate(tables, autoIncrementStart = 1) {
 		const connection = await Database.connect();
 
