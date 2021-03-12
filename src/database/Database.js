@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const DatabaseException = require('../exceptions/DatabaseException');
 require('dotenv').config({ path: `${__dirname}/.env` });
 
 class Database {
@@ -11,6 +12,23 @@ class Database {
 		});
 
 		return connection;
+	}
+
+	static async execute(statement, bindParameters) {
+		const connection = await Database.connect();
+		let results;
+
+		try {
+			[results] = await connection.execute(statement, bindParameters);
+		}
+		catch (exception) {
+			throw new DatabaseException(exception);
+		}
+		finally {
+			await connection.end();
+		}
+
+		return results;
 	}
 
 	static async truncate(tables, autoIncrementStart = 1) {

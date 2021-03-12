@@ -1,11 +1,61 @@
+const { parse } = require('querystring');
 const http = require('http');
+const fs = require('fs');
 const App = require('./src/App');
 
-const logTimestamp = (request) => {
-	const date = new Date();
-	const formattedDate = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-	const formattedTime = `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
-	console.log(`[${formattedDate} ${formattedTime}] Received HTTP ${request.method} request for ${request.url}`);
+/**
+ * If the request is a POST or a PUT, that means the client
+ * wants to send some data to the server. This data is found
+ * in the request body. This function will extract the data
+ * from the request body, provided that the data is either in
+ * x-www-form-urlencoded format or JSON format.
+ * @param {Object} httpRequest
+ * @returns {Object} The parsed HTTP request body.
+ */
+const getRequestBody = async (httpRequest) => new Promise((resolve, reject) => {
+	const chunks = [];
+
+	httpRequest.on('data', (chunk) => chunks.push(chunk));
+	httpRequest.on('error', (err) => reject(err));
+	httpRequest.on('end', () => {
+		const contentType = httpRequest.headers['content-type'];
+		const body = chunks.join('');
+		let result;
+
+		switch (contentType) {
+			case 'application/x-www-form-urlencoded':
+				result = parse(body);
+				break;
+			case 'application/json':
+				result = JSON.parse(body);
+				break;
+			default:
+				result = '';
+		}
+
+		resolve(result);
+	});
+});
+
+/**
+ * A static file is a file that the client requests for
+ * directly. This is anything with a valid file extension.
+ * Within the context of the web, this is usually .html,
+ * .css, .js, and any image/video/audio file types.
+ * @param {string} url
+ * @param {Object} response
+ */
+const serveStaticFile = (url, response) => {
+	const filePath = `.${url}`;
+
+	fs.readFile(filePath, (error, content) => {
+		if (error) {
+			response.writeHead(500);
+			return response.end(`${error}`);
+		}
+
+		return response.end(content, 'utf-8');
+	});
 };
 
 /**
@@ -17,9 +67,19 @@ const logTimestamp = (request) => {
  * @param {Object} response
  */
 const server = http.createServer(async (request, response) => {
-	logTimestamp(request);
+	if (request.url.match(/.*\..*/)) {
+		return serveStaticFile(request.url, response);
+	}
+	/**
+	 * The browser automatically requests for favicon.ico which is
+	 * the little icon that appears in the in the browser tab. For
+	 * now we can ignore this.
+	 */
+	if (request.url.match(/.*favicon\.ico/)) {
+		return response.end();
+	}
 
-	const app = new App();
+	const app = new App(request, response, await getRequestBody(request));
 	await app.handleRequest(request);
 	await app.sendResponse(response);
 });

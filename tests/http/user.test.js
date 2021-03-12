@@ -1,7 +1,9 @@
 const {
 	generateUserData,
 	generateUser,
+	generateUsers,
 	makeHttpRequest,
+	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
@@ -40,7 +42,7 @@ test('Invalid request method returned error.', async () => {
 });
 
 test('User created successfully.', async () => {
-	const initialUserId = Math.floor(Math.random() * 100) + 1;
+	const initialUserId = generateRandomId();
 	await truncateDatabase(['user'], initialUserId);
 
 	const userData = generateUserData();
@@ -68,7 +70,7 @@ test('User not created with blank username.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not created.');
+	expect(response.message).toBe('Cannot create User: Missing username.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -79,7 +81,7 @@ test('User not created with blank email.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not created.');
+	expect(response.message).toBe('Cannot create User: Missing email.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -90,7 +92,7 @@ test('User not created with blank password.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not created.');
+	expect(response.message).toBe('Cannot create User: Missing password.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -102,7 +104,7 @@ test('User not created with duplicate username.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not created.');
+	expect(response.message).toBe('Cannot create User: Duplicate username.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -114,22 +116,12 @@ test('User not created with duplicate email.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not created.');
+	expect(response.message).toBe('Cannot create User: Duplicate email.');
 	expect(response.payload).toMatchObject({});
 });
 
 test('All users found.', async () => {
-	let users = [];
-	const numberOfUsers = Math.floor(Math.random() * 10) + 1;
-
-	for (let i = 0; i < numberOfUsers; i++) {
-		users.push(generateUser());
-	}
-
-	users = await Promise.all(users);
-
-	users.sort((userA, userB) => userA.getId() - userB.getId());
-
+	const users = await generateUsers();
 	const [statusCode, response] = await makeHttpRequest('GET', '/user');
 
 	expect(statusCode).toBe(200);
@@ -137,7 +129,7 @@ test('All users found.', async () => {
 	expect(Object.keys(response).includes('payload')).toBe(true);
 	expect(response.message).toBe('Users retrieved successfully!');
 	expect(Array.isArray(response.payload)).toBe(true);
-	expect(response.payload.length).toBe(numberOfUsers);
+	expect(response.payload.length).toBe(users.length);
 
 	response.payload.forEach((user, index) => {
 		expect(Object.keys(user).includes('id')).toBe(true);
@@ -172,13 +164,13 @@ test('User found by ID.', async () => {
 });
 
 test('User not found by wrong ID.', async () => {
-	const userId = Math.floor(Math.random() * 100) + 1;
+	const userId = generateRandomId();
 	const [statusCode, response] = await makeHttpRequest('GET', `/user/${userId}`);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not retrieved.');
+	expect(response.message).toBe(`Cannot retrieve User: User does not exist with ID ${userId}.`);
 	expect(response.payload).toMatchObject({});
 });
 
@@ -211,12 +203,13 @@ test('User updated successfully.', async () => {
 });
 
 test('User not updated with non-existant ID.', async () => {
-	const [statusCode, response] = await makeHttpRequest('PUT', '/user/1', { username: '' });
+	const userId = generateRandomId();
+	const [statusCode, response] = await makeHttpRequest('PUT', `/user/${userId}`, { username: 'NewUsername' });
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not updated.');
+	expect(response.message).toBe(`Cannot update User: User does not exist with ID ${userId}.`);
 	expect(response.payload).toMatchObject({});
 });
 
@@ -227,7 +220,7 @@ test('User not updated with blank username.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not updated.');
+	expect(response.message).toBe('Cannot update User: No update parameters were provided.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -238,7 +231,7 @@ test('User not updated with blank email.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not updated.');
+	expect(response.message).toBe('Cannot update User: No update parameters were provided.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -268,12 +261,13 @@ test('User deleted successfully.', async () => {
 });
 
 test('User not deleted with non-existant ID.', async () => {
-	const [statusCode, response] = await makeHttpRequest('DELETE', '/user/1');
+	const userId = generateRandomId();
+	const [statusCode, response] = await makeHttpRequest('DELETE', `/user/${userId}`);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('User not deleted.');
+	expect(response.message).toBe(`Cannot delete User: User does not exist with ID ${userId}.`);
 	expect(response.payload).toMatchObject({});
 });
 

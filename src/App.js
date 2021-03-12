@@ -1,6 +1,9 @@
 const Router = require('./router/Router');
 const Request = require('./router/Request');
-const Response = require('./router/Response');
+const JsonResponse = require('./router/JsonResponse');
+const HtmlResponse = require('./router/HtmlResponse');
+const HttpStatusCode = require('./helpers/HttpStatusCode');
+const logger = require('./helpers/Logger');
 
 /**
  * The App class is responsible for handling the HTTP request
@@ -8,70 +11,53 @@ const Response = require('./router/Response');
  * objects.
  */
 class App {
-	/**
-	 * Parse the body of the HTTP request and instantiate new
-	 * Request, Response, and Router objects.
-	 * @param {Object} httpRequest
-	 */
-	async handleRequest(httpRequest) {
-		const requestBody = await App.getRequestBody(httpRequest);
-		const request = new Request(httpRequest.method, httpRequest.url, requestBody);
-		this.router = new Router(request, new Response());
+	constructor(httpRequest, httpResponse, requestBody) {
+		this.httpRequest = httpRequest;
+		this.httpResponse = httpResponse;
+		this.requestBody = requestBody;
+
+		logger.toggleConsoleLog(true);
 	}
 
 	/**
-	 * If the request is a POST or a PUT, that means the client
-	 * wants to send some data to the server. This data is found
-	 * in the request body. This function will extract the data
-	 * from the request body, provided that the data is either in
-	 * x-www-form-urlencoded format or JSON format.
-	 * @param {Object} httpRequest
-	 * @returns {Object} The parsed HTTP request body.
+	 * Parse the body of the HTTP request and instantiate new
+	 * Request, Response, and Router objects.
 	 */
-	static async getRequestBody(httpRequest) {
-		return new Promise((resolve, reject) => {
-			const chunks = [];
+	async handleRequest() {
+		const requestMethod = this.getRequestMethod();
+		const request = new Request(requestMethod, this.httpRequest.url, this.requestBody);
+		const response = this.getResponseType();
 
-			httpRequest.on('data', (chunk) => chunks.push(chunk));
-			httpRequest.on('error', (err) => reject(err));
-			httpRequest.on('end', () => {
-				const contentType = httpRequest.headers['content-type'];
-				const body = chunks.join('');
-				let result;
+		logger.info(`📨 >> ${requestMethod} ${this.httpRequest.url} ${JSON.stringify(this.requestBody)}`);
 
-				switch (contentType) {
-					case 'application/x-www-form-urlencoded':
-						result = body.split('&').reduce((accumulator, parameter) => {
-							const [key, value] = parameter.split('=');
-							accumulator[key] = value;
-							return accumulator;
-						}, {});
-						break;
-					case 'application/json':
-						result = JSON.parse(body);
-						break;
-					default:
-						result = '';
-				}
-
-				resolve(result);
-			});
-		});
+		this.router = new Router(request, response);
 	}
 
 	/**
 	 * Dispatch the router and use the returned Response to send
 	 * back an HTTP response to the client.
-	 * @param {Object} httpResponse
 	 */
-	async sendResponse(httpResponse) {
+	async sendResponse() {
 		const response = await this.router.dispatch();
+		const status = HttpStatusCode.getStatusFromCode(response.getStatusCode());
 
-		httpResponse.writeHead(response.getStatusCode(), {
-			'Content-Type': 'application/json',
-		});
+		logger.info(`💌 << ${response.getStatusCode()} ${status}`);
 
-		httpResponse.end(response.toString());
+		this.httpResponse.writeHead(response.getStatusCode(), response.getHeaders());
+		this.httpResponse.end(response.toString());
+	}
+
+	getRequestMethod() {
+		return this.requestBody.method ?? this.httpRequest.method;
+	}
+
+	getResponseType() {
+		switch (this.httpRequest.headers.accept) {
+			case 'application/json':
+				return new JsonResponse();
+			default:
+				return new HtmlResponse();
+		}
 	}
 }
 

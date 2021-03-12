@@ -1,7 +1,9 @@
 const {
 	generateCategoryData,
 	generateCategory,
+	generateCategories,
 	makeHttpRequest,
+	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
@@ -10,7 +12,7 @@ beforeEach(async () => {
 });
 
 test('Category created successfully.', async () => {
-	const initialCategoryId = Math.floor(Math.random() * 100) + 1;
+	const initialCategoryId = generateRandomId();
 	await truncateDatabase(['category'], initialCategoryId);
 
 	const categoryData = await generateCategoryData();
@@ -36,14 +38,14 @@ test('Category created successfully.', async () => {
 test('Category not created with non-existant user.', async () => {
 	const categoryData = await generateCategoryData();
 
-	categoryData.userId = 999;
+	categoryData.userId = generateRandomId(categoryData.userId);
 
 	const [statusCode, response] = await makeHttpRequest('POST', '/category', categoryData);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not created.');
+	expect(response.message).toBe(`Cannot create Category: User does not exist with ID ${categoryData.userId}.`);
 	expect(response.payload).toMatchObject({});
 });
 
@@ -57,7 +59,7 @@ test('Category not created with blank title.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not created.');
+	expect(response.message).toBe('Cannot create Category: Missing title.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -72,22 +74,12 @@ test('Category not created with duplicate title.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not created.');
+	expect(response.message).toBe('Cannot create Category: Duplicate title.');
 	expect(response.payload).toMatchObject({});
 });
 
 test('All categories found.', async () => {
-	let categories = [];
-	const numberOfCategories = Math.floor(Math.random() * 10) + 1;
-
-	for (let i = 0; i < numberOfCategories; i++) {
-		categories.push(generateCategory());
-	}
-
-	categories = await Promise.all(categories);
-
-	categories.sort((categoryA, categoryB) => categoryA.getId() - categoryB.getId());
-
+	const categories = await generateCategories();
 	const [statusCode, response] = await makeHttpRequest('GET', '/category');
 
 	expect(statusCode).toBe(200);
@@ -95,7 +87,7 @@ test('All categories found.', async () => {
 	expect(Object.keys(response).includes('payload')).toBe(true);
 	expect(response.message).toBe('Categories retrieved successfully!');
 	expect(Array.isArray(response.payload)).toBe(true);
-	expect(response.payload.length).toBe(numberOfCategories);
+	expect(response.payload.length).toBe(categories.length);
 
 	response.payload.forEach((category, index) => {
 		expect(Object.keys(category).includes('id')).toBe(true);
@@ -134,13 +126,13 @@ test('Category found by ID.', async () => {
 });
 
 test('Category not found by wrong ID.', async () => {
-	const categoryId = Math.floor(Math.random() * 100) + 1;
+	const categoryId = generateRandomId();
 	const [statusCode, response] = await makeHttpRequest('GET', `/category/${categoryId}`);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not retrieved.');
+	expect(response.message).toBe(`Cannot retrieve Category: Category does not exist with ID ${categoryId}.`);
 	expect(response.payload).toMatchObject({});
 });
 
@@ -173,12 +165,13 @@ test('Category updated successfully.', async () => {
 });
 
 test('Category not updated with non-existant ID.', async () => {
-	const [statusCode, response] = await makeHttpRequest('PUT', '/category/1', { title: 'Pokemon' });
+	const categoryId = generateRandomId();
+	const [statusCode, response] = await makeHttpRequest('PUT', `/category/${categoryId}`, { title: 'Pokemon' });
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not updated.');
+	expect(response.message).toBe(`Cannot update Category: Category does not exist with ID ${categoryId}.`);
 	expect(response.payload).toMatchObject({});
 });
 
@@ -189,7 +182,7 @@ test('Category not updated with blank title.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not updated.');
+	expect(response.message).toBe('Cannot update Category: No update parameters were provided.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -200,7 +193,7 @@ test('Category not updated with blank description.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not updated.');
+	expect(response.message).toBe('Cannot update Category: No update parameters were provided.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -230,12 +223,13 @@ test('Category deleted successfully.', async () => {
 });
 
 test('Category not deleted with non-existant ID.', async () => {
-	const [statusCode, response] = await makeHttpRequest('DELETE', '/category/1');
+	const categoryId = generateRandomId();
+	const [statusCode, response] = await makeHttpRequest('DELETE', `/category/${categoryId}`);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Category not deleted.');
+	expect(response.message).toBe(`Cannot delete Category: Category does not exist with ID ${categoryId}.`);
 	expect(response.payload).toMatchObject({});
 });
 

@@ -6,6 +6,7 @@ const {
 	generateCategory,
 	generatePost,
 	generatePostData,
+	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
@@ -14,7 +15,7 @@ let category;
 let initialPostId;
 
 beforeEach(async () => {
-	initialPostId = Math.floor(Math.random() * 100) + 1;
+	initialPostId = generateRandomId();
 	await truncateDatabase(['post'], initialPostId);
 
 	user = await generateUser();
@@ -38,37 +39,46 @@ test('Post created successfully.', async () => {
 });
 
 test('Post not created with non-existant user.', async () => {
-	user.setId(999);
+	const wrongId = generateRandomId(user.getId());
 
-	const post = await generatePost({ user });
+	user.setId(wrongId);
 
-	expect(post).toBeNull();
+	await expect(generatePost({ user })).rejects.toMatchObject({
+		name: 'PostException',
+		message: `Cannot create Post: User does not exist with ID ${wrongId}.`,
+	});
 });
 
 test('Post not created with non-existant category.', async () => {
-	category.setId(999);
+	const wrongId = generateRandomId(category.getId());
 
-	const post = await generatePost({ category });
+	category.setId(wrongId);
 
-	expect(post).toBeNull();
+	await expect(generatePost({ category })).rejects.toMatchObject({
+		name: 'PostException',
+		message: `Cannot create Post: Category does not exist with ID ${wrongId}.`,
+	});
 });
 
 test('Post not created with blank title.', async () => {
-	const post = await generatePost({ title: '' });
-
-	expect(post).toBeNull();
+	await expect(generatePost({ title: '' })).rejects.toMatchObject({
+		name: 'PostException',
+		message: 'Cannot create Post: Missing title.',
+	});
 });
 
 test('Post not created with blank type.', async () => {
-	const post = await generatePost({ type: '' });
-
-	expect(post).toBeNull();
+	await expect(generatePost({ type: '' })).rejects.toMatchObject({
+		name: 'PostException',
+		message: 'Cannot create Post: Missing type.',
+	});
 });
 
 test('Post not created with blank content.', async () => {
-	const post = await generatePost({ content: '' });
-
-	expect(post).toBeNull();
+	await expect(generatePost({ content: '' })).rejects.toMatchObject({
+		name: 'PostException',
+		message: 'Cannot create Post: Missing content.',
+	});
 });
 
 test('Post found by ID.', async () => {
@@ -124,9 +134,10 @@ test('Post (Text) not updated with blank content.', async () => {
 
 	post.setContent('');
 
-	const wasUpdated = await post.save();
-
-	expect(wasUpdated).toBe(false);
+	await expect(post.save()).rejects.toMatchObject({
+		name: 'PostException',
+		message: 'Cannot update Post: Missing content.',
+	});
 });
 
 test('Post (URL) not updated.', async () => {
@@ -134,9 +145,10 @@ test('Post (URL) not updated.', async () => {
 
 	post.setContent('https://pokemon.com');
 
-	const wasUpdated = await post.save();
-
-	expect(wasUpdated).toBe(false);
+	await expect(post.save()).rejects.toMatchObject({
+		name: 'PostException',
+		message: 'Cannot update Post: Only text posts are editable.',
+	});
 });
 
 test('Post deleted successfully.', async () => {
