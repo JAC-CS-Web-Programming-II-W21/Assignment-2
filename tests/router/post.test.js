@@ -1,248 +1,57 @@
 const Router = require('../../src/router/Router');
-const JsonResponse = require('../../src/router/JsonResponse');
+const Response = require('../../src/router/Response');
 const Request = require('../../src/router/Request');
+const Post = require('../../src/models/Post');
 const Database = require('../../src/database/Database');
-const {
-	generatePostData,
-	generatePost,
-	generateRandomId,
-	truncateDatabase,
-} = require('../TestHelper');
+const PostController = require('../../src/controllers/PostController');
 
-beforeEach(async () => {
-	await truncateDatabase();
+/**
+ * A "mock" is a testing concept that allows us to "spy" on entities in
+ * our application. In our case, we want to spy on the controller and
+ * model classes to see when/if they are being invoked. Using these mocks
+ * allows us to use the "toHaveBeenCalled" assertion in the third test of
+ * this test suite.
+ */
+jest.mock('../../src/controllers/PostController');
+jest.mock('../../src/models/Post');
+
+beforeEach(() => {
+	PostController.mockClear();
+	Post.mockClear();
 });
 
-test('Post created successfully.', async () => {
-	const initialPostId = generateRandomId();
-	await truncateDatabase(['post'], initialPostId);
+test('Router set the PostController', () => {
+	const router = new Router(new Request(), new Response());
 
-	const postData = await generatePostData();
-	const request = new Request('POST', '/post', postData);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
+	router.setController('post');
 
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(200);
-	expect(response.getMessage()).toBe('Post created successfully!');
-	expect(response.getPayload().getId()).toBe(initialPostId);
-	expect(response.getPayload().getTitle()).toBe(postData.title);
-	expect(response.getPayload().getContent()).toBe(postData.content);
-	expect(response.getPayload().getUser().getId()).toBe(postData.userId);
-	expect(response.getPayload().getCategory().getId()).toBe(postData.categoryId);
-	expect(response.getPayload().getCreatedAt()).toBeNull();
-	expect(response.getPayload().getEditedAt()).toBeNull();
-	expect(response.getPayload().getDeletedAt()).toBeNull();
+	expect(router.getController()).toBeInstanceOf(PostController);
 });
 
-test('Post not created with non-existant user.', async () => {
-	const postData = await generatePostData();
+/**
+ * This test expects the proper controller to have been invoked after
+ * calling the router's dispatch function. It also tests that the model
+ * is not being invoked directly from the router. It is now the controller's
+ * responsibility to make calls to the the models, therefore the only thing
+ * the router should be calling is the controller.
+ */
+test.each`
+	requestMethod | path
+	${'POST'}     | ${'/post'}
+	${'GET'}      | ${'/post'}
+	${'GET'}      | ${'/post/1'}
+	${'PUT'}      | ${'/post/1'}
+	${'DELETE'}   | ${'/post/1'}
+`('Router called PostController for a $requestMethod $path request.', async ({
+	requestMethod, path,
+}) => {
+	const request = new Request(requestMethod, path);
+	const router = new Router(request, new Response());
 
-	postData.userId = generateRandomId(postData.userId);
+	await router.dispatch();
 
-	const request = new Request('POST', '/post', postData);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe(`Cannot create Post: User does not exist with ID ${postData.userId}.`);
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post not created with non-existant category.', async () => {
-	const postData = await generatePostData();
-
-	postData.categoryId = generateRandomId(postData.categoryId);
-
-	const request = new Request('POST', '/post', postData);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe(`Cannot create Post: Category does not exist with ID ${postData.categoryId}.`);
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post not created with blank title.', async () => {
-	const postData = await generatePostData();
-
-	postData.title = '';
-
-	const request = new Request('POST', '/post', postData);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe('Cannot create Post: Missing title.');
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post not created with blank type.', async () => {
-	const postData = await generatePostData();
-
-	postData.type = '';
-
-	const request = new Request('POST', '/post', postData);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe('Cannot create Post: Missing type.');
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post not created with blank content.', async () => {
-	const postData = await generatePostData();
-
-	postData.content = '';
-
-	const request = new Request('POST', '/post', postData);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe('Cannot create Post: Missing content.');
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post found by ID.', async () => {
-	const post = await generatePost();
-	const request = new Request('GET', `/post/${post.getId()}`);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(200);
-	expect(response.getMessage()).toBe('Post retrieved successfully!');
-	expect(response.getPayload().getId()).toBe(post.getId());
-	expect(response.getPayload().getTitle()).toBe(post.getTitle());
-	expect(response.getPayload().getContent()).toBe(post.getContent());
-	expect(response.getPayload().getUser().getId()).toBe(post.getUser().getId());
-	expect(response.getPayload().getCategory().getId()).toBe(post.getCategory().getId());
-	expect(response.getPayload().getCreatedAt()).not.toBeNull();
-	expect(response.getPayload().getEditedAt()).toBeNull();
-	expect(response.getPayload().getDeletedAt()).toBeNull();
-});
-
-test('Post not found by wrong ID.', async () => {
-	const postId = generateRandomId();
-	const request = new Request('GET', `/post/${postId}`);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe(`Cannot retrieve Post: Post does not exist with ID ${postId}.`);
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post (Text) content updated successfully.', async () => {
-	const post = await generatePost({ type: 'Text' });
-	const { content: newPostContent } = await generatePostData();
-	let request = new Request('PUT', `/post/${post.getId()}`, { content: newPostContent });
-	let router = new Router(request, new JsonResponse());
-	let response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(200);
-	expect(response.getMessage()).toBe('Post updated successfully!');
-	expect(response.getPayload().getId()).toBe(post.getId());
-	expect(response.getPayload().getContent()).toBe(newPostContent);
-	expect(response.getPayload().getContent()).not.toBe(post.getContent());
-	expect(response.getPayload().getUser().getId()).toBe(post.getUser().getId());
-	expect(response.getPayload().getCategory().getId()).toBe(post.getCategory().getId());
-
-	request = new Request('GET', `/post/${post.getId()}`);
-	router = new Router(request, new JsonResponse());
-	response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(200);
-	expect(response.getPayload().getContent()).toBe(newPostContent);
-	expect(response.getPayload().getCreatedAt()).not.toBeNull();
-	expect(response.getPayload().getEditedAt()).not.toBeNull();
-	expect(response.getPayload().getDeletedAt()).toBeNull();
-});
-
-test('Post (Text) not updated with non-existant ID.', async () => {
-	const postId = generateRandomId();
-	const request = new Request('PUT', `/post/${postId}`, { content: 'New content!' });
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe(`Cannot update Post: Post does not exist with ID ${postId}.`);
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post (Text) not updated with blank content.', async () => {
-	const post = await generatePost({ type: 'Text' });
-	const request = new Request('PUT', `/post/${post.getId()}`, { content: '' });
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe('Cannot update Post: No update parameters were provided.');
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post (URL) not updated.', async () => {
-	const post = await generatePost({ type: 'URL' });
-	const request = new Request('PUT', `/post/${post.getId()}`, { content: 'https://pokemon.com' });
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe('Cannot update Post: Only text posts are editable.');
-	expect(response.getPayload()).toMatchObject({});
-});
-
-test('Post deleted successfully.', async () => {
-	const post = await generatePost();
-	let request = new Request('DELETE', `/post/${post.getId()}`);
-	let router = new Router(request, new JsonResponse());
-	let response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(200);
-	expect(response.getMessage()).toBe('Post deleted successfully!');
-	expect(response.getPayload().getId()).toBe(post.getId());
-	expect(response.getPayload().getTitle()).toBe(post.getTitle());
-	expect(response.getPayload().getContent()).toBe(post.getContent());
-	expect(response.getPayload().getUser().getId()).toBe(post.getUser().getId());
-	expect(response.getPayload().getCategory().getId()).toBe(post.getCategory().getId());
-
-	request = new Request('GET', `/post/${post.getId()}`);
-	router = new Router(request, new JsonResponse());
-	response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(200);
-	expect(response.getPayload().getTitle()).toBe(post.getTitle());
-	expect(response.getPayload().getContent()).toBe(post.getContent());
-	expect(response.getPayload().getCreatedAt()).not.toBeNull();
-	expect(response.getPayload().getEditedAt()).toBeNull();
-	expect(response.getPayload().getDeletedAt()).not.toBeNull();
-});
-
-test('Post not deleted with non-existant ID.', async () => {
-	const postId = generateRandomId();
-	const request = new Request('DELETE', `/post/${postId}`);
-	const router = new Router(request, new JsonResponse());
-	const response = await router.dispatch();
-
-	expect(response).toBeInstanceOf(JsonResponse);
-	expect(response.getStatusCode()).toBe(400);
-	expect(response.getMessage()).toBe(`Cannot delete Post: Post does not exist with ID ${postId}.`);
-	expect(response.getPayload()).toMatchObject({});
+	expect(PostController).toHaveBeenCalled();
+	expect(Post).not.toHaveBeenCalled();
 });
 
 afterEach(async () => {

@@ -4,8 +4,6 @@ const {
 	generateUser,
 	generateCategoryData,
 	generateCategory,
-	generateCategories,
-	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
@@ -13,7 +11,7 @@ let user;
 let initialCategoryId;
 
 beforeEach(async () => {
-	initialCategoryId = generateRandomId();
+	initialCategoryId = Math.floor(Math.random() * 100) + 1;
 	await truncateDatabase(['category'], initialCategoryId);
 
 	user = await generateUser();
@@ -32,21 +30,17 @@ test('Category created successfully.', async () => {
 });
 
 test('Category not created with non-existant user.', async () => {
-	const wrongId = generateRandomId(user.getId());
+	user.setId(999);
 
-	user.setId(wrongId);
+	const category = await generateCategory(user);
 
-	await expect(generateCategory(user)).rejects.toMatchObject({
-		name: 'CategoryException',
-		message: `Cannot create Category: User does not exist with ID ${wrongId}.`,
-	});
+	expect(category).toBeNull();
 });
 
 test('Category not created with blank title.', async () => {
-	await expect(generateCategory(user, '')).rejects.toMatchObject({
-		name: 'CategoryException',
-		message: 'Cannot create Category: Missing title.',
-	});
+	const category = await generateCategory(user, '');
+
+	expect(category).toBeNull();
 });
 
 test('Category not created with duplicate title.', async () => {
@@ -54,29 +48,9 @@ test('Category not created with duplicate title.', async () => {
 
 	await generateCategory(user, title);
 
-	await expect(generateCategory(user, title)).rejects.toMatchObject({
-		name: 'CategoryException',
-		message: 'Cannot create Category: Duplicate title.',
-	});
-});
+	const category = await generateCategory(user, title);
 
-test('All categories found.', async () => {
-	const categories = await generateCategories();
-	const retrievedCategories = await Category.findAll();
-
-	retrievedCategories.forEach((category, index) => {
-		expect(Object.keys(category).includes('id')).toBe(true);
-		expect(Object.keys(category).includes('title')).toBe(true);
-		expect(Object.keys(category).includes('description')).toBe(true);
-		expect(Object.keys(category).includes('user')).toBe(true);
-		expect(category.id).toBe(categories[index].getId());
-		expect(category.title).toBe(categories[index].getTitle());
-		expect(category.description).toBe(categories[index].getDescription());
-		expect(category.user.id).toBe(categories[index].getUser().getId());
-		expect(category.createdAt).not.toBeNull();
-		expect(category.editedAt).toBeNull();
-		expect(category.deletedAt).toBeNull();
-	});
+	expect(category).toBeNull();
 });
 
 test('Category found by ID.', async () => {
@@ -145,10 +119,9 @@ test('Category not updated with blank title.', async () => {
 
 	category.setTitle('');
 
-	await expect(category.save()).rejects.toMatchObject({
-		name: 'CategoryException',
-		message: 'Cannot update Category: Missing title.',
-	});
+	const wasUpdated = await category.save();
+
+	expect(wasUpdated).toBe(false);
 });
 
 test('Category deleted successfully.', async () => {

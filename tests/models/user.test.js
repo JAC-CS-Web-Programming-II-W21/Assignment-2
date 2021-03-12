@@ -3,15 +3,13 @@ const User = require('../../src/models/User');
 const {
 	generateUserData,
 	generateUser,
-	generateUsers,
-	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
 let initialUserId;
 
 beforeEach(async () => {
-	initialUserId = generateRandomId();
+	initialUserId = Math.floor(Math.random() * 100) + 1;
 	await truncateDatabase(['user'], initialUserId);
 });
 
@@ -26,24 +24,21 @@ test('User created successfully.', async () => {
 });
 
 test('User not created with blank username.', async () => {
-	await expect(generateUser('')).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot create User: Missing username.',
-	});
+	const user = await generateUser('');
+
+	expect(user).toBeNull();
 });
 
 test('User not created with blank email.', async () => {
-	await expect(generateUser(null, '')).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot create User: Missing email.',
-	});
+	const user = await generateUser(null, '');
+
+	expect(user).toBeNull();
 });
 
 test('User not created with blank password.', async () => {
-	await expect(generateUser(null, null, '')).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot create User: Missing password.',
-	});
+	const user = await generateUser(null, null, '');
+
+	expect(user).toBeNull();
 });
 
 test('User not created with duplicate username.', async () => {
@@ -51,10 +46,9 @@ test('User not created with duplicate username.', async () => {
 
 	await generateUser(username);
 
-	await expect(generateUser(username)).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot create User: Duplicate username.',
-	});
+	const user = await generateUser(username);
+
+	expect(user).toBeNull();
 });
 
 test('User not created with duplicate email.', async () => {
@@ -62,28 +56,9 @@ test('User not created with duplicate email.', async () => {
 
 	await generateUser(null, email);
 
-	await expect(generateUser(null, email)).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot create User: Duplicate email.',
-	});
-});
+	const user = await generateUser(null, email);
 
-test('All users found.', async () => {
-	const users = await generateUsers();
-	const retrievedUsers = await User.findAll();
-
-	retrievedUsers.forEach((user, index) => {
-		expect(Object.keys(user).includes('id')).toBe(true);
-		expect(Object.keys(user).includes('username')).toBe(true);
-		expect(Object.keys(user).includes('email')).toBe(true);
-		expect(user.getId()).toBe(users[index].getId());
-		expect(user.getUsername()).toBe(users[index].getUsername());
-		expect(user.getEmail()).toBe(users[index].getEmail());
-		expect(user.getUsername()).toMatch(users[index].getUsername());
-		expect(user.getCreatedAt()).toBeInstanceOf(Date);
-		expect(user.getEditedAt()).toBeNull();
-		expect(user.getDeletedAt()).toBeNull();
-	});
+	expect(user).toBeNull();
 });
 
 test('User found by ID.', async () => {
@@ -162,10 +137,9 @@ test('User not updated with blank username.', async () => {
 
 	user.setUsername('');
 
-	await expect(user.save()).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot update User: Missing username.',
-	});
+	const wasUpdated = await user.save();
+
+	expect(wasUpdated).toBe(false);
 });
 
 test('User not updated with blank email.', async () => {
@@ -173,10 +147,9 @@ test('User not updated with blank email.', async () => {
 
 	user.setEmail('');
 
-	await expect(user.save()).rejects.toMatchObject({
-		name: 'UserException',
-		message: 'Cannot update User: Missing email.',
-	});
+	const wasUpdated = await user.save();
+
+	expect(wasUpdated).toBe(false);
 });
 
 test('User deleted successfully.', async () => {

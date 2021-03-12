@@ -6,7 +6,6 @@ const {
 	generatePost,
 	generateCommentData,
 	generateComment,
-	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
@@ -15,7 +14,7 @@ let post;
 let initialCommentId;
 
 beforeEach(async () => {
-	initialCommentId = generateRandomId();
+	initialCommentId = Math.floor(Math.random() * 100) + 1;
 	await truncateDatabase(['comment'], initialCommentId);
 
 	user = await generateUser();
@@ -38,7 +37,7 @@ test('Comment created successfully.', async () => {
 
 test('Comment reply created successfully.', async () => {
 	const comment = await generateComment({ user, post });
-	const reply = await generateComment({ replyId: comment.getId() });
+	const reply = await generateComment({ reply: comment });
 
 	expect(reply).toBeInstanceOf(Comment);
 	expect(reply.getId()).toBe(comment.getId() + 1);
@@ -47,32 +46,25 @@ test('Comment reply created successfully.', async () => {
 });
 
 test('Comment not created with non-existant user.', async () => {
-	const wrongId = generateRandomId(user.getId());
+	user.setId(999);
 
-	user.setId(wrongId);
+	const comment = await generateComment({ user });
 
-	await expect(generateComment({ user })).rejects.toMatchObject({
-		name: 'CommentException',
-		message: `Cannot create Comment: User does not exist with ID ${wrongId}.`,
-	});
+	expect(comment).toBeNull();
 });
 
 test('Comment not created with non-existant post.', async () => {
-	const wrongId = generateRandomId(post.getId());
+	post.setId(999);
 
-	post.setId(wrongId);
+	const comment = await generateComment({ post });
 
-	await expect(generateComment({ post })).rejects.toMatchObject({
-		name: 'CommentException',
-		message: `Cannot create Comment: Post does not exist with ID ${wrongId}.`,
-	});
+	expect(comment).toBeNull();
 });
 
 test('Comment not created with blank content.', async () => {
-	await expect(generateComment({ content: '' })).rejects.toMatchObject({
-		name: 'CommentException',
-		message: 'Cannot create Comment: Missing content.',
-	});
+	const comment = await generateComment({ content: '' });
+
+	expect(comment).toBeNull();
 });
 
 test('Comment found by ID.', async () => {
@@ -123,10 +115,9 @@ test('Comment not updated with blank content.', async () => {
 
 	comment.setContent('');
 
-	await expect(comment.save()).rejects.toMatchObject({
-		name: 'CommentException',
-		message: 'Cannot update Comment: Missing content.',
-	});
+	const wasUpdated = await comment.save();
+
+	expect(wasUpdated).toBe(false);
 });
 
 test('Comment deleted successfully.', async () => {

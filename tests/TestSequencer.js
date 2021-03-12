@@ -20,10 +20,6 @@ class TestSequencer extends Sequencer {
 			path.join(__dirname, './http/category.test.js'),
 			path.join(__dirname, './http/post.test.js'),
 			path.join(__dirname, './http/comment.test.js'),
-			path.join(__dirname, './browser/user.test.js'),
-			path.join(__dirname, './browser/category.test.js'),
-			path.join(__dirname, './browser/post.test.js'),
-			path.join(__dirname, './browser/comment.test.js'),
 		];
 
 		return tests.sort((testA, testB) => {

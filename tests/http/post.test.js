@@ -2,7 +2,6 @@ const {
 	generatePostData,
 	generatePost,
 	makeHttpRequest,
-	generateRandomId,
 	truncateDatabase,
 } = require('../TestHelper');
 
@@ -11,7 +10,7 @@ beforeEach(async () => {
 });
 
 test('Post created successfully.', async () => {
-	const initialPostId = generateRandomId();
+	const initialPostId = Math.floor(Math.random() * 100) + 1;
 	await truncateDatabase(['post'], initialPostId);
 
 	const postData = await generatePostData();
@@ -39,28 +38,28 @@ test('Post created successfully.', async () => {
 test('Post not created with non-existant user.', async () => {
 	const postData = await generatePostData();
 
-	postData.userId = generateRandomId(postData.userId);
+	postData.userId = 999;
 
 	const [statusCode, response] = await makeHttpRequest('POST', '/post', postData);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe(`Cannot create Post: User does not exist with ID ${postData.userId}.`);
+	expect(response.message).toBe('Post not created.');
 	expect(response.payload).toMatchObject({});
 });
 
 test('Post not created with non-existant category.', async () => {
 	const postData = await generatePostData();
 
-	postData.categoryId = generateRandomId(postData.categoryId);
+	postData.categoryId = 999;
 
 	const [statusCode, response] = await makeHttpRequest('POST', '/post', postData);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe(`Cannot create Post: Category does not exist with ID ${postData.categoryId}.`);
+	expect(response.message).toBe('Post not created.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -74,7 +73,7 @@ test('Post not created with blank title.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Cannot create Post: Missing title.');
+	expect(response.message).toBe('Post not created.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -88,7 +87,7 @@ test('Post not created with blank type.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Cannot create Post: Missing type.');
+	expect(response.message).toBe('Post not created.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -102,7 +101,7 @@ test('Post not created with blank content.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Cannot create Post: Missing content.');
+	expect(response.message).toBe('Post not created.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -130,13 +129,13 @@ test('Post found by ID.', async () => {
 });
 
 test('Post not found by wrong ID.', async () => {
-	const postId = generateRandomId();
+	const postId = Math.floor(Math.random() * 100) + 1;
 	const [statusCode, response] = await makeHttpRequest('GET', `/post/${postId}`);
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe(`Cannot retrieve Post: Post does not exist with ID ${postId}.`);
+	expect(response.message).toBe('Post not retrieved.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -170,13 +169,12 @@ test('Post (Text) content updated successfully.', async () => {
 });
 
 test('Post (Text) not updated with non-existant ID.', async () => {
-	const postId = generateRandomId();
-	const [statusCode, response] = await makeHttpRequest('PUT', `/post/${postId}`, { content: 'New content!' });
+	const [statusCode, response] = await makeHttpRequest('PUT', '/post/1', { content: 'New content!' });
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe(`Cannot update Post: Post does not exist with ID ${postId}.`);
+	expect(response.message).toBe('Post not updated.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -187,7 +185,7 @@ test('Post (Text) not updated with blank content.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Cannot update Post: No update parameters were provided.');
+	expect(response.message).toBe('Post not updated.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -198,7 +196,7 @@ test('Post (URL) not updated.', async () => {
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe('Cannot update Post: Only text posts are editable.');
+	expect(response.message).toBe('Post not updated.');
 	expect(response.payload).toMatchObject({});
 });
 
@@ -232,13 +230,12 @@ test('Post deleted successfully.', async () => {
 });
 
 test('Post not deleted with non-existant ID.', async () => {
-	const postId = generateRandomId();
-	const [statusCode, response] = await makeHttpRequest('DELETE', `/post/${postId}`);
+	const [statusCode, response] = await makeHttpRequest('DELETE', '/post/1');
 
 	expect(statusCode).toBe(400);
 	expect(Object.keys(response).includes('message')).toBe(true);
 	expect(Object.keys(response).includes('payload')).toBe(true);
-	expect(response.message).toBe(`Cannot delete Post: Post does not exist with ID ${postId}.`);
+	expect(response.message).toBe('Post not deleted.');
 	expect(response.payload).toMatchObject({});
 });
 
